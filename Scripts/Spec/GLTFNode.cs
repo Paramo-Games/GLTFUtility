@@ -1,17 +1,20 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using Siccity.GLTFUtility.Converters;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
-using Siccity.GLTFUtility.Converters;
 using UnityEngine;
 using UnityEngine.Scripting;
 
-namespace Siccity.GLTFUtility {
+namespace Siccity.GLTFUtility
+{
 	// https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#node
-	[Preserve] public class GLTFNode {
-#region Serialization
+	[Preserve]
+	public class GLTFNode
+	{
+		#region Serialization
 		public string name;
 		/// <summary> Indices of child nodes </summary>
 		public int[] children;
@@ -27,14 +30,27 @@ namespace Siccity.GLTFUtility {
 		public int? skin;
 		public int? camera;
 		public int? weights;
+		public Extensions extensions;
+
+		[Preserve]
+		public class Extensions
+		{
+			public KHR_lights_punctual KHR_lights_punctual;
+		}
+
+		public interface IExtension
+		{
+			void Apply(GLTFLight lightInfo, Transform transform);
+		}
 
 		public bool ShouldSerializetranslation() { return translation != Vector3.zero; }
 		public bool ShouldSerializerotation() { return rotation != Quaternion.identity; }
 		public bool ShouldSerializescale() { return scale != Vector3.one; }
-#endregion
+		#endregion
 
-#region Import
-		public class ImportResult {
+		#region Import
+		public class ImportResult
+		{
 			public int? parent;
 			public int[] children;
 			public Transform transform;
@@ -43,31 +59,38 @@ namespace Siccity.GLTFUtility {
 		}
 
 		/// <summary> Set local position, rotation and scale </summary>
-		public void ApplyTRS(Transform transform) {
-			if(matrix!=Matrix4x4.identity)
-				matrix.UnpackTRS(ref translation, ref rotation, ref scale); 
+		public void ApplyTRS(Transform transform)
+		{
+			if (matrix != Matrix4x4.identity)
+				matrix.UnpackTRS(ref translation, ref rotation, ref scale);
 			transform.localPosition = translation;
 			transform.localRotation = rotation;
 			transform.localScale = scale;
 		}
 
-		public class ImportTask : Importer.ImportTask<ImportResult[]> {
+		public class ImportTask : Importer.ImportTask<ImportResult[]>
+		{
 			List<GLTFNode> nodes;
 			GLTFMesh.ImportTask meshTask;
 			GLTFSkin.ImportTask skinTask;
 			List<GLTFCamera> cameras;
+			List<GLTFLight> lights;
 
-			public ImportTask(List<GLTFNode> nodes, GLTFMesh.ImportTask meshTask, GLTFSkin.ImportTask skinTask, List<GLTFCamera> cameras) : base(meshTask, skinTask) {
+			public ImportTask(List<GLTFNode> nodes, GLTFMesh.ImportTask meshTask, GLTFSkin.ImportTask skinTask, List<GLTFCamera> cameras, List<GLTFLight> lights) : base(meshTask, skinTask)
+			{
 				this.nodes = nodes;
 				this.meshTask = meshTask;
 				this.skinTask = skinTask;
 				this.cameras = cameras;
+				this.lights = lights;
 				//task = new Task(() => { });
 			}
 
-			public override IEnumerator OnCoroutine(Action<float> onProgress = null) {
+			public override IEnumerator OnCoroutine(Action<float> onProgress = null)
+			{
 				// No nodes
-				if (nodes == null) {
+				if (nodes == null)
+				{
 					if (onProgress != null) onProgress.Invoke(1f);
 					IsCompleted = true;
 					yield break;
@@ -75,19 +98,22 @@ namespace Siccity.GLTFUtility {
 
 				Result = new ImportResult[nodes.Count];
 
-				
 				// Initialize transforms
-				for (int i = 0; i < Result.Length; i++) {
+				for (int i = 0; i < Result.Length; i++)
+				{
 					Result[i] = new GLTFNode.ImportResult();
 					Result[i].transform = new GameObject().transform;
 					Result[i].transform.name = nodes[i].name;
 				}
 				// Set up hierarchy
-				for (int i = 0; i < Result.Length; i++) {
-					if (nodes[i].children != null) {
+				for (int i = 0; i < Result.Length; i++)
+				{
+					if (nodes[i].children != null)
+					{
 						int[] children = nodes[i].children;
 						Result[i].children = children;
-						for (int k = 0; k < children.Length; k++) {
+						for (int k = 0; k < children.Length; k++)
+						{
 							int childIndex = children[k];
 							Result[childIndex].parent = i;
 							Result[childIndex].transform.parent = Result[i].transform;
@@ -95,27 +121,35 @@ namespace Siccity.GLTFUtility {
 					}
 				}
 				// Apply TRS
-				for (int i = 0; i < Result.Length; i++) {
+				for (int i = 0; i < Result.Length; i++)
+				{
 					nodes[i].ApplyTRS(Result[i].transform);
 				}
 				// Setup components
-				for (int i = 0; i < Result.Length; i++) {
+				for (int i = 0; i < Result.Length; i++)
+				{
 					// Setup mesh
-					if (nodes[i].mesh.HasValue) {
+					if (nodes[i].mesh.HasValue)
+					{
 						GLTFMesh.ImportResult meshResult = meshTask.Result[nodes[i].mesh.Value];
 						if (meshResult == null) continue;
 
 						Mesh mesh = meshResult.mesh;
 						Renderer renderer;
-						if (nodes[i].skin.HasValue) {
+						if (nodes[i].skin.HasValue)
+						{
 							GLTFSkin.ImportResult skin = skinTask.Result[nodes[i].skin.Value];
 							renderer = skin.SetupSkinnedRenderer(Result[i].transform.gameObject, mesh, Result);
-						} else if (mesh.blendShapeCount > 0) {
+						}
+						else if (mesh.blendShapeCount > 0)
+						{
 							// Blend shapes require skinned mesh renderer
 							SkinnedMeshRenderer mr = Result[i].transform.gameObject.AddComponent<SkinnedMeshRenderer>();
 							mr.sharedMesh = mesh;
 							renderer = mr;
-						} else {
+						}
+						else
+						{
 							MeshRenderer mr = Result[i].transform.gameObject.AddComponent<MeshRenderer>();
 							MeshFilter mf = Result[i].transform.gameObject.AddComponent<MeshFilter>();
 							renderer = mr;
@@ -124,21 +158,27 @@ namespace Siccity.GLTFUtility {
 						//Materials
 						renderer.materials = meshResult.materials;
 						if (string.IsNullOrEmpty(Result[i].transform.name)) Result[i].transform.name = "node" + i;
-					} else {
+					}
+					else
+					{
 						if (string.IsNullOrEmpty(Result[i].transform.name)) Result[i].transform.name = "node" + i;
 					}
 
 					// Setup camera
-					if (nodes[i].camera.HasValue) {
+					if (nodes[i].camera.HasValue)
+					{
 						GLTFCamera cameraData = cameras[nodes[i].camera.Value];
 						Camera camera = Result[i].transform.gameObject.AddComponent<Camera>();
 						Result[i].transform.localRotation = Result[i].transform.localRotation * Quaternion.Euler(0, 180, 0);
-						if (cameraData.type == CameraType.orthographic) {
+						if (cameraData.type == CameraType.orthographic)
+						{
 							camera.orthographic = true;
 							camera.nearClipPlane = cameraData.orthographic.znear;
 							camera.farClipPlane = cameraData.orthographic.zfar;
 							camera.orthographicSize = cameraData.orthographic.ymag;
-						} else {
+						}
+						else
+						{
 							camera.orthographic = false;
 							camera.nearClipPlane = cameraData.perspective.znear;
 							if (cameraData.perspective.zfar.HasValue) camera.farClipPlane = cameraData.perspective.zfar.Value;
@@ -146,26 +186,35 @@ namespace Siccity.GLTFUtility {
 							camera.fieldOfView = Mathf.Rad2Deg * cameraData.perspective.yfov;
 						}
 					}
+
+					if (nodes[i].extensions != null && nodes[i].extensions.KHR_lights_punctual != null)
+					{
+						GLTFLight lightData = lights[nodes[i].extensions.KHR_lights_punctual.light];
+						nodes[i].extensions.KHR_lights_punctual.Apply(lightData, Result[i].transform);
+					}
 				}
 				IsCompleted = true;
 			}
 		}
-#endregion
+		#endregion
 
-#region Export
-		public class ExportResult : GLTFNode {
+		#region Export
+		public class ExportResult : GLTFNode
+		{
 			[JsonIgnore] public MeshRenderer renderer;
 			[JsonIgnore] public MeshFilter filter;
 			[JsonIgnore] public SkinnedMeshRenderer skinnedRenderer;
 		}
 
-		public static List<ExportResult> Export(Transform root) {
+		public static List<ExportResult> Export(Transform root)
+		{
 			List<ExportResult> nodes = new List<ExportResult>();
 			CreateNodeListRecursive(root, nodes);
 			return nodes;
 		}
 
-		private static void CreateNodeListRecursive(Transform transform, List<ExportResult> nodes) {
+		private static void CreateNodeListRecursive(Transform transform, List<ExportResult> nodes)
+		{
 			ExportResult node = new ExportResult();
 			node.name = transform.name;
 			node.translation = transform.localPosition;
@@ -175,10 +224,13 @@ namespace Siccity.GLTFUtility {
 			node.filter = transform.gameObject.GetComponent<MeshFilter>();
 			node.skinnedRenderer = transform.gameObject.GetComponent<SkinnedMeshRenderer>();
 			nodes.Add(node);
-			if (transform.childCount > 0) {
-				if (transform.childCount > 0) {
+			if (transform.childCount > 0)
+			{
+				if (transform.childCount > 0)
+				{
 					node.children = new int[transform.childCount];
-					for (int i = 0; i < node.children.Length; i++) {
+					for (int i = 0; i < node.children.Length; i++)
+					{
 						Transform child = transform.GetChild(i);
 						node.children[i] = nodes.Count;
 						CreateNodeListRecursive(child, nodes);
@@ -186,24 +238,28 @@ namespace Siccity.GLTFUtility {
 				}
 			}
 		}
-#endregion
+		#endregion
 	}
 
-	public static class GLTFNodeExtensions {
-#region Import
+	public static class GLTFNodeExtensions
+	{
+		#region Import
 		/// <summary> Returns the root if there is one, otherwise creates a new empty root </summary>
-		public static GameObject GetRoot(this GLTFNode.ImportResult[] nodes) {
+		public static GameObject GetRoot(this GLTFNode.ImportResult[] nodes)
+		{
 			GLTFNode.ImportResult[] roots = nodes.Where(x => x.IsRoot).ToArray();
 
 			if (roots.Length == 1) return roots[0].transform.gameObject;
-			else {
+			else
+			{
 				GameObject root = new GameObject("Root");
-				for (int i = 0; i < roots.Length; i++) {
+				for (int i = 0; i < roots.Length; i++)
+				{
 					roots[i].transform.parent = root.transform;
 				}
 				return root;
 			}
 		}
-#endregion
+		#endregion
 	}
 }
