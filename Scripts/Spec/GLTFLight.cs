@@ -6,6 +6,7 @@ using UnityEngine.Scripting;
 namespace Siccity.GLTFUtility
 {
 	// https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md
+	[Preserve]
 	public class GLTFLight
 	{
 		#region Serialization
