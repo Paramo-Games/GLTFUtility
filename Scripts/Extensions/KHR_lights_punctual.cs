@@ -18,6 +18,7 @@ namespace Siccity.GLTFUtility
 
 		public void Apply(GLTFLight lightInfo, Transform transform)
 		{
+			transform.localRotation *= Quaternion.Euler(0, 180, 0);
 			Light light = transform.gameObject.AddComponent<Light>();
 			light.intensity = lightInfo.intensity * intensityCorrector;
 			light.color = lightInfo.color;
