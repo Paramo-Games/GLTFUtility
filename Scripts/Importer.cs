@@ -242,7 +242,7 @@ namespace Siccity.GLTFUtility
 			meshTask.RunSynchronously();
 			GLTFSkin.ImportTask skinTask = new GLTFSkin.ImportTask(gltfObject.skins, accessorTask);
 			skinTask.RunSynchronously();
-			GLTFNode.ImportTask nodeTask = new GLTFNode.ImportTask(gltfObject.nodes, meshTask, skinTask, gltfObject.cameras, gltfObject.extensions.KHR_lights_punctual.lights);
+			GLTFNode.ImportTask nodeTask = new GLTFNode.ImportTask(gltfObject.nodes, meshTask, skinTask, gltfObject.cameras, gltfObject.extensions?.KHR_lights_punctual?.lights);
 			nodeTask.RunSynchronously();
 			GLTFAnimation.ImportResult[] animationResult = gltfObject.animations.Import(accessorTask.Result, nodeTask.Result, importSettings);
 			if (animationResult != null) animations = animationResult.Select(x => x.clip).ToArray();
@@ -345,7 +345,7 @@ namespace Siccity.GLTFUtility
 			importTasks.Add(meshTask);
 			GLTFSkin.ImportTask skinTask = new GLTFSkin.ImportTask(gltfObject.skins, accessorTask);
 			importTasks.Add(skinTask);
-			GLTFNode.ImportTask nodeTask = new GLTFNode.ImportTask(gltfObject.nodes, meshTask, skinTask, gltfObject.cameras, gltfObject.extensions.KHR_lights_punctual.lights);
+			GLTFNode.ImportTask nodeTask = new GLTFNode.ImportTask(gltfObject.nodes, meshTask, skinTask, gltfObject.cameras, gltfObject.extensions?.KHR_lights_punctual?.lights);
 			importTasks.Add(nodeTask);
 
 			// Ignite
